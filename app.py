@@ -14,7 +14,6 @@ CORS(app)
 DOWNLOAD_DIR = Path("downloads")
 DOWNLOAD_DIR.mkdir(exist_ok=True)
 
-# Track download jobs: { job_id: { status, progress, filename, error, filepath } }
 jobs = {}
 
 def clean_filename(name):
@@ -36,7 +35,6 @@ def run_download(job_id, url, quality, fmt):
 
     output_path = str(DOWNLOAD_DIR / f"{job_id}.%(ext)s")
 
-    # Build format string
     if fmt == "mp3":
         ydl_opts = {
             "format": "bestaudio/best",
@@ -48,16 +46,20 @@ def run_download(job_id, url, quality, fmt):
                 "preferredquality": "192",
             }],
             "quiet": True,
+            "no_warnings": True,
+            "socket_timeout": 30,
         }
     else:
         height_map = {"1080p": 1080, "720p": 720, "480p": 480, "360p": 360, "240p": 240}
         height = height_map.get(quality, 720)
         ydl_opts = {
-            "format": f"bestvideo[height<={height}]+bestaudio/best[height<={height}]/best",
+            "format": f"bestvideo[height<={height}][ext=mp4]+bestaudio[ext=m4a]/best[height<={height}]/best",
             "outtmpl": output_path,
             "progress_hooks": [progress_hook],
             "merge_output_format": "mp4",
             "quiet": True,
+            "no_warnings": True,
+            "socket_timeout": 30,
         }
 
     try:
@@ -67,7 +69,6 @@ def run_download(job_id, url, quality, fmt):
             ext = "mp3" if fmt == "mp3" else "mp4"
             jobs[job_id]["title"] = title
             jobs[job_id]["filename"] = f"{title}.{ext}"
-            # Find the output file
             for f in DOWNLOAD_DIR.iterdir():
                 if f.stem == job_id:
                     jobs[job_id]["filepath"] = str(f)
@@ -75,7 +76,6 @@ def run_download(job_id, url, quality, fmt):
             jobs[job_id]["status"] = "done"
             jobs[job_id]["progress"] = 100
 
-        # Auto-delete after 10 minutes
         def cleanup():
             time.sleep(600)
             fp = jobs[job_id].get("filepath")
@@ -101,8 +101,17 @@ def get_info():
     if not url:
         return jsonify({"error": "No URL provided"}), 400
     try:
-        with yt_dlp.YoutubeDL({"quiet": True, "skip_download": True}) as ydl:
+        ydl_opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "skip_download": True,
+            "socket_timeout": 20,
+            # Try to avoid bot detection
+            "extractor_args": {"youtube": {"skip": ["dash", "hls"]}},
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
+
         formats = []
         seen = set()
         for f in (info.get("formats") or []):
@@ -116,18 +125,32 @@ def get_info():
                 })
         formats.sort(key=lambda x: int(x["quality"][:-1]), reverse=True)
         if not formats:
-            formats = [{"quality": "720p", "size_mb": None}]
+            formats = [
+                {"quality": "1080p", "size_mb": None},
+                {"quality": "720p", "size_mb": None},
+                {"quality": "480p", "size_mb": None},
+                {"quality": "360p", "size_mb": None},
+            ]
+
         return jsonify({
             "title": info.get("title", "Video"),
             "thumbnail": info.get("thumbnail"),
-            "duration": info.get("duration_string") or str(int(info.get("duration", 0) or 0)) + "s",
+            "duration": info.get("duration_string") or "",
             "uploader": info.get("uploader") or info.get("channel", ""),
             "view_count": info.get("view_count"),
             "platform": info.get("extractor_key", ""),
             "formats": formats[:6],
         })
     except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        err = str(e)
+        # Friendlier error messages
+        if "Sign in" in err or "bot" in err.lower():
+            err = "YouTube is blocking this request. Try a different video or use a direct youtu.be link."
+        elif "Private" in err or "private" in err:
+            err = "This video is private."
+        elif "unavailable" in err.lower():
+            err = "This video is unavailable."
+        return jsonify({"error": err}), 400
 
 
 @app.route("/api/download", methods=["POST"])
@@ -171,6 +194,11 @@ def download_file(job_id):
     if not fp or not os.path.exists(fp):
         return jsonify({"error": "File not found"}), 404
     return send_file(fp, as_attachment=True, download_name=job["filename"])
+
+
+@app.route("/api/ping")
+def ping():
+    return jsonify({"status": "ok"})
 
 
 if __name__ == "__main__":
