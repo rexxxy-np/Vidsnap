@@ -20,8 +20,7 @@ jobs = {}
 
 def clean_filename(name):
     return re.sub(r'[^\w\s\-_.]', '', name)[:80]
-
-    def get_base_opts():
+def get_base_opts():
     opts = {
         "quiet": True,
         "no_warnings": True,
