@@ -27,6 +27,7 @@ def get_base_opts():
         "no_warnings": True,
         "socket_timeout": 30,
         "extractor_args": {"youtube": {"player_client": ["tv_embedded"]}},
+    }
     if os.path.exists(COOKIES_FILE):
         opts["cookiefile"] = COOKIES_FILE
     return opts
