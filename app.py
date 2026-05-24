@@ -20,6 +20,7 @@ jobs = {}
 
 def clean_filename(name):
     return re.sub(r'[^\w\s\-_.]', '', name)[:80]
+
 def get_base_opts():
     opts = {
         "quiet": True,
@@ -30,7 +31,8 @@ def get_base_opts():
     if os.path.exists(COOKIES_FILE):
         opts["cookiefile"] = COOKIES_FILE
     return opts
-    def run_download(job_id, url, quality, fmt):
+
+def run_download(job_id, url, quality, fmt):
     jobs[job_id]["status"] = "downloading"
 
     def progress_hook(d):
@@ -61,9 +63,9 @@ def get_base_opts():
         height_map = {"1080p": 1080, "720p": 720, "480p": 480, "360p": 360, "240p": 240}
         height = height_map.get(quality, 720)
         opts["format"] = (
-    f"bestvideo[height<={height}]+bestaudio/"
-    f"best[height<={height}]/"
-    f"best"
+            f"bestvideo[height<={height}]+bestaudio/"
+            f"best[height<={height}]/"
+            f"best"
         )
         opts["merge_output_format"] = "mp4"
 
@@ -203,4 +205,3 @@ def ping():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-    
