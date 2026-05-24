@@ -61,7 +61,11 @@ def run_download(job_id, url, quality, fmt):
     else:
         height_map = {"1080p": 1080, "720p": 720, "480p": 480, "360p": 360, "240p": 240}
         height = height_map.get(quality, 720)
-        opts["format"] = f"bestvideo[height<={height}][ext=mp4]+bestaudio[ext=m4a]/best[height<={height}]/best"
+        opts["format"] = (
+    f"bestvideo[height<={height}]+bestaudio/"
+    f"best[height<={height}]/"
+    f"best"
+        )
         opts["merge_output_format"] = "mp4"
 
     try:
