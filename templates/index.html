@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VidSnap — Video Downloader</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --card: #1a1a24;
+    --border: #2a2a3a;
+    --accent: #ff4d6d;
+    --accent2: #ff9a3c;
+    --grad: linear-gradient(135deg, #ff4d6d, #ff9a3c);
+    --text: #f0f0f8;
+    --muted: #7a7a9a;
+    --success: #4ade80;
+    --info: #38bdf8;
+    --error: #f87171;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif; min-height:100vh; }
+
+  header {
+    background:var(--surface);
+    border-bottom:1px solid var(--border);
+    padding:0 24px;
+    height:60px;
+    display:flex;
+    align-items:center;
+    gap:14px;
+    position:sticky;
+    top:0;
+    z-index:50;
+  }
+  .logo { font-family:'Syne',sans-serif; font-weight:800; font-size:1.5rem; background:var(--grad); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+  .tagline { font-size:0.78rem; color:var(--muted); }
+
+  .container { max-width:780px; margin:0 auto; padding:40px 20px; }
+
+  /* TABS */
+  .tab-bar {
+    display:flex;
+    gap:4px;
+    background:var(--bg);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:4px;
+    margin-bottom:20px;
+  }
+  .tab-btn {
+    flex:1;
+    background:transparent;
+    border:none;
+    border-radius:9px;
+    color:var(--muted);
+    font-family:'Syne',sans-serif;
+    font-weight:700;
+    font-size:0.88rem;
+    padding:10px;
+    cursor:pointer;
+    transition:all 0.2s;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+  }
+  .tab-btn.active {
+    background:var(--grad);
+    color:white;
+  }
+
+  /* URL INPUT CARD */
+  .url-card {
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:20px;
+    padding:28px;
+    position:relative;
+    overflow:hidden;
+    margin-bottom:28px;
+  }
+  .url-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--grad); }
+  .url-card h1 { font-family:'Syne',sans-serif; font-size:1.35rem; font-weight:800; margin-bottom:6px; }
+  .url-card p { color:var(--muted); font-size:0.88rem; margin-bottom:20px; }
+
+  .input-row { display:flex; gap:10px; margin-bottom:14px; }
+  .url-input {
+    flex:1;
+    background:var(--bg);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:13px 16px;
+    color:var(--text);
+    font-family:'DM Sans',sans-serif;
+    font-size:0.92rem;
+    outline:none;
+    transition:border-color 0.2s;
+  }
+  .url-input:focus { border-color:var(--accent); }
+  .url-input::placeholder { color:var(--muted); }
+  .btn-primary {
+    background:var(--grad);
+    border:none;
+    border-radius:12px;
+    color:white;
+    font-family:'Syne',sans-serif;
+    font-weight:700;
+    font-size:0.9rem;
+    padding:13px 22px;
+    cursor:pointer;
+    white-space:nowrap;
+    transition:opacity 0.2s, transform 0.15s;
+    display:flex; align-items:center; gap:8px;
+  }
+  .btn-primary:hover { opacity:0.88; transform:scale(1.02); }
+  .btn-primary:disabled { opacity:0.5; cursor:not-allowed; transform:none; }
+  .btn-secondary {
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:10px;
+    color:var(--muted);
+    font-size:0.85rem;
+    padding:10px 14px;
+    cursor:pointer;
+    transition:all 0.2s;
+    font-family:'DM Sans',sans-serif;
+  }
+  .btn-secondary:hover { color:var(--text); border-color:var(--muted); }
+
+  .platforms { display:flex; flex-wrap:wrap; gap:7px; align-items:center; }
+  .platforms span { font-size:0.72rem; color:var(--muted); }
+  .pill { background:var(--bg); border:1px solid var(--border); border-radius:20px; padding:3px 10px; font-size:0.72rem; color:var(--muted); }
+
+  /* LOADER */
+  .analyzing {
+    display:none;
+    align-items:center;
+    gap:12px;
+    padding:16px;
+    background:var(--surface);
+    border-radius:12px;
+    margin-bottom:16px;
+    color:var(--muted);
+    font-size:0.88rem;
+  }
+  .spinner {
+    width:20px; height:20px;
+    border:2px solid var(--border);
+    border-top-color:var(--accent);
+    border-radius:50%;
+    animation:spin 0.8s linear infinite;
+    flex-shrink:0;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* VIDEO INFO */
+  .video-info {
+    display:none;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:18px;
+    margin-bottom:20px;
+    gap:16px;
+  }
+  .vi-thumb { width:120px; height:68px; border-radius:8px; object-fit:cover; flex-shrink:0; background:var(--border); }
+  .vi-details { flex:1; min-width:0; }
+  .vi-title { font-family:'Syne',sans-serif; font-weight:700; font-size:0.95rem; margin-bottom:4px; line-height:1.3; }
+  .vi-meta { font-size:0.78rem; color:var(--muted); }
+
+  /* QUALITY SELECTOR */
+  .options-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:16px 0; }
+  .opt-btn {
+    background:var(--bg);
+    border:2px solid var(--border);
+    border-radius:10px;
+    padding:10px 8px;
+    text-align:center;
+    cursor:pointer;
+    transition:all 0.2s;
+    color:var(--text);
+  }
+  .opt-btn:hover { border-color:var(--accent); }
+  .opt-btn.sel { border-color:var(--accent); background:rgba(255,77,109,0.1); }
+  .opt-btn .qlabel { font-family:'Syne',sans-serif; font-weight:700; font-size:0.95rem; }
+  .opt-btn .qsize { font-size:0.7rem; color:var(--muted); margin-top:2px; }
+  .opt-btn .qtag { font-size:0.62rem; background:var(--grad); color:white; padding:1px 6px; border-radius:3px; margin-top:3px; display:inline-block; }
+
+  .fmt-row { display:flex; gap:8px; margin-bottom:18px; }
+  .fmt-btn {
+    flex:1;
+    background:var(--bg);
+    border:2px solid var(--border);
+    border-radius:10px;
+    padding:9px;
+    text-align:center;
+    cursor:pointer;
+    font-size:0.82rem;
+    font-weight:600;
+    transition:all 0.2s;
+    color:var(--muted);
+    font-family:'DM Sans',sans-serif;
+  }
+  .fmt-btn:hover { border-color:var(--info); color:var(--info); }
+  .fmt-btn.sel { border-color:var(--info); color:var(--info); background:rgba(56,189,248,0.1); }
+
+  .dl-big-btn {
+    width:100%;
+    background:var(--grad);
+    border:none;
+    border-radius:14px;
+    color:white;
+    font-family:'Syne',sans-serif;
+    font-weight:700;
+    font-size:1rem;
+    padding:15px;
+    cursor:pointer;
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    transition:opacity 0.2s;
+  }
+  .dl-big-btn:hover { opacity:0.88; }
+  .dl-big-btn:disabled { opacity:0.5; cursor:not-allowed; }
+
+  /* PROGRESS */
+  .progress-card {
+    display:none;
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:20px 24px;
+    margin-top:20px;
+  }
+  .prog-title { font-family:'Syne',sans-serif; font-weight:700; margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+  .prog-bar-track { height:6px; background:var(--border); border-radius:3px; overflow:hidden; margin-bottom:8px; }
+  .prog-bar-fill { height:100%; background:var(--grad); border-radius:3px; transition:width 0.5s ease; width:0%; }
+  .prog-meta { display:flex; justify-content:space-between; font-size:0.78rem; color:var(--muted); }
+
+  .dl-ready {
+    display:none;
+    background:rgba(74,222,128,0.08);
+    border:1px solid rgba(74,222,128,0.25);
+    border-radius:14px;
+    padding:18px 20px;
+    margin-top:20px;
+    align-items:center;
+    gap:14px;
+  }
+  .dl-ready-title { font-family:'Syne',sans-serif; font-weight:700; color:var(--success); margin-bottom:3px; }
+  .dl-ready-sub { font-size:0.8rem; color:var(--muted); }
+  .dl-file-btn {
+    background:var(--success);
+    border:none;
+    border-radius:10px;
+    color:#0a0a0f;
+    font-family:'Syne',sans-serif;
+    font-weight:700;
+    font-size:0.88rem;
+    padding:10px 18px;
+    cursor:pointer;
+    white-space:nowrap;
+    transition:opacity 0.2s;
+    text-decoration:none;
+    display:inline-block;
+  }
+  .dl-file-btn:hover { opacity:0.88; }
+
+  .error-box {
+    display:none;
+    background:rgba(248,113,113,0.08);
+    border:1px solid rgba(248,113,113,0.25);
+    border-radius:12px;
+    padding:14px 18px;
+    color:var(--error);
+    font-size:0.88rem;
+    margin-top:14px;
+    line-height:1.5;
+  }
+
+  /* SEARCH SECTION */
+  .search-section { display:none; }
+  .search-input-row { display:flex; gap:10px; margin-bottom:20px; }
+  .search-input {
+    flex:1;
+    background:var(--bg);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:13px 16px;
+    color:var(--text);
+    font-family:'DM Sans',sans-serif;
+    font-size:0.92rem;
+    outline:none;
+    transition:border-color 0.2s;
+  }
+  .search-input:focus { border-color:var(--accent); }
+  .search-input::placeholder { color:var(--muted); }
+
+  .search-results { display:flex; flex-direction:column; gap:12px; margin-top:16px; }
+  .result-card {
+    display:flex;
+    gap:14px;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:14px;
+    cursor:pointer;
+    transition:all 0.2s;
+    align-items:center;
+  }
+  .result-card:hover { border-color:var(--accent); background:rgba(255,77,109,0.05); }
+  .result-thumb {
+    width:80px;
+    height:80px;
+    border-radius:10px;
+    object-fit:cover;
+    flex-shrink:0;
+    background:var(--border);
+  }
+  .result-info { flex:1; min-width:0; }
+  .result-title { font-family:'Syne',sans-serif; font-weight:700; font-size:0.9rem; margin-bottom:4px; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .result-meta { font-size:0.75rem; color:var(--muted); margin-bottom:6px; }
+  .result-dl-btn {
+    background:var(--grad);
+    border:none;
+    border-radius:8px;
+    color:white;
+    font-family:'Syne',sans-serif;
+    font-weight:700;
+    font-size:0.78rem;
+    padding:7px 14px;
+    cursor:pointer;
+    white-space:nowrap;
+    flex-shrink:0;
+    transition:opacity 0.2s;
+  }
+  .result-dl-btn:hover { opacity:0.85; }
+
+  .search-empty {
+    text-align:center;
+    color:var(--muted);
+    font-size:0.88rem;
+    padding:40px 20px;
+    display:none;
+  }
+  .search-empty .big-icon { font-size:2.5rem; margin-bottom:10px; }
+
+  /* TIPS */
+  .tips {
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:20px 24px;
+    margin-top:24px;
+  }
+  .tips h3 { font-family:'Syne',sans-serif; font-size:0.9rem; margin-bottom:12px; color:var(--muted); font-weight:700; }
+  .tip-list { list-style:none; display:flex; flex-direction:column; gap:8px; }
+  .tip-list li { font-size:0.83rem; color:var(--muted); padding-left:20px; position:relative; line-height:1.5; }
+  .tip-list li::before { content:'→'; position:absolute; left:0; color:var(--accent); }
+
+  /* NOTICE */
+  .notice {
+    background:rgba(56,189,248,0.06);
+    border:1px solid rgba(56,189,248,0.2);
+    border-radius:10px;
+    padding:12px 16px;
+    font-size:0.78rem;
+    color:var(--info);
+    margin-top:16px;
+    line-height:1.5;
+  }
+
+  @media (max-width:500px) {
+    .options-grid { grid-template-columns:repeat(2,1fr); }
+    .input-row { flex-wrap:wrap; }
+    .btn-primary { width:100%; justify-content:center; }
+    .vi-thumb { display:none; }
+    .result-thumb { width:60px; height:60px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">VidSnap</div>
+  <div class="tagline">Free video downloader — YouTube, Instagram, TikTok & more</div>
+</header>
+
+<div class="container">
+
+  <div class="url-card">
+
+    <!-- TABS -->
+    <div class="tab-bar">
+      <button class="tab-btn active" id="tabURL" onclick="switchTab('url')">
+        🔗 URL Download
+      </button>
+      <button class="tab-btn" id="tabSearch" onclick="switchTab('search')">
+        🎵 Search Songs
+      </button>
+    </div>
+
+    <!-- URL SECTION -->
+    <div id="urlSection">
+      <h1>Download Any Video</h1>
+      <p>Paste a video URL from YouTube, TikTok, Instagram, Twitter, Facebook, Vimeo and 1000+ sites.</p>
+
+      <div class="input-row">
+        <input class="url-input" id="urlInput" type="url" placeholder="https://www.youtube.com/watch?v=...">
+        <button class="btn-secondary" onclick="pasteURL()" title="Paste from clipboard">📋 Paste</button>
+        <button class="btn-primary" id="analyzeBtn" onclick="analyzeURL()">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          Analyze
+        </button>
+      </div>
+
+      <div class="platforms">
+        <span>Supports:</span>
+        <span class="pill">YouTube</span>
+        <span class="pill">TikTok</span>
+        <span class="pill">Instagram</span>
+        <span class="pill">Facebook</span>
+        <span class="pill">Twitter/X</span>
+        <span class="pill">Vimeo</span>
+        <span class="pill">Reddit</span>
+        <span class="pill">+1000 more</span>
+      </div>
+
+      <!-- Analyzing loader -->
+      <div class="analyzing" id="analyzeLoader" style="margin-top:16px;">
+        <div class="spinner"></div>
+        <span id="analyzeMsg">Fetching video info…</span>
+      </div>
+
+      <!-- Video info panel -->
+      <div class="video-info" id="videoInfo" style="display:none; margin-top:16px;">
+        <img class="vi-thumb" id="viThumb" src="" alt="">
+        <div class="vi-details">
+          <div class="vi-title" id="viTitle"></div>
+          <div class="vi-meta" id="viMeta"></div>
+        </div>
+      </div>
+
+      <!-- Quality selection -->
+      <div id="qualitySection" style="display:none; margin-top:4px;">
+        <div style="font-size:0.78rem; color:var(--muted); margin-bottom:8px; font-weight:500;">Select Quality</div>
+        <div class="options-grid" id="qualityGrid"></div>
+
+        <div style="font-size:0.78rem; color:var(--muted); margin-bottom:8px; font-weight:500; margin-top:16px;">Format</div>
+        <div class="fmt-row">
+          <div class="fmt-btn sel" data-fmt="mp4" onclick="selFmt(this)">MP4</div>
+          <div class="fmt-btn" data-fmt="mp3" onclick="selFmt(this)">MP3 (Audio)</div>
+          <div class="fmt-btn" data-fmt="webm" onclick="selFmt(this)">WEBM</div>
+        </div>
+
+        <button class="dl-big-btn" id="dlBtn" onclick="startDownload()">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download Now
+        </button>
+      </div>
+
+      <!-- Error -->
+      <div class="error-box" id="errorBox"></div>
+    </div>
+
+    <!-- SEARCH SECTION -->
+    <div class="search-section" id="searchSection">
+      <h1>Search Songs</h1>
+      <p>Search SoundCloud for any song and download as MP3.</p>
+
+      <div class="search-input-row">
+        <input class="search-input" id="searchInput" type="text" placeholder="Search for a song or artist...">
+        <button class="btn-primary" id="searchBtn" onclick="searchSongs()">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          Search
+        </button>
+      </div>
+
+      <!-- Search loader -->
+      <div class="analyzing" id="searchLoader">
+        <div class="spinner"></div>
+        <span>Searching SoundCloud…</span>
+      </div>
+
+      <!-- Empty state -->
+      <div class="search-empty" id="searchEmpty">
+        <div class="big-icon">🎵</div>
+        <div>Search for any song above to get started</div>
+      </div>
+
+      <!-- Results -->
+      <div class="search-results" id="searchResults"></div>
+
+      <!-- Search error -->
+      <div class="error-box" id="searchErrorBox"></div>
+    </div>
+
+  </div>
+
+  <!-- PROGRESS CARD -->
+  <div class="progress-card" id="progressCard">
+    <div class="prog-title">
+      <div class="spinner"></div>
+      <span id="progLabel">Downloading…</span>
+    </div>
+    <div class="prog-bar-track">
+      <div class="prog-bar-fill" id="progBar"></div>
+    </div>
+    <div class="prog-meta">
+      <span id="progPct">0%</span>
+      <span id="progSpeed"></span>
+    </div>
+  </div>
+
+  <!-- READY CARD -->
+  <div class="dl-ready" id="dlReady">
+    <div class="dl-ready-icon">✅</div>
+    <div class="dl-ready-info">
+      <div class="dl-ready-title">Ready to save!</div>
+      <div class="dl-ready-sub" id="dlReadyName"></div>
+    </div>
+    <a class="dl-file-btn" id="dlFileLink" href="#" download>⬇ Save File</a>
+  </div>
+
+  <div class="notice">
+    ⚡ Files are automatically deleted from the server after 10 minutes. Download promptly after processing.
+  </div>
+
+  <div class="tips">
+    <h3>TIPS & NOTES</h3>
+    <ul class="tip-list">
+      <li>For YouTube, copy the full URL from the address bar or share button.</li>
+      <li>Private or age-restricted videos may not be downloadable.</li>
+      <li>Instagram: public posts and reels work best.</li>
+      <li>Higher quality = larger file and longer processing time.</li>
+      <li>Only download content you have the right to download.</li>
+    </ul>
+  </div>
+
+</div>
+
+<script>
+  let selectedQuality = '720p';
+  let selectedFormat = 'mp4';
+  let currentJobId = null;
+  let pollTimer = null;
+  let currentVideoInfo = null;
+  let activeTab = 'url';
+
+  // TAB SWITCHING
+  function switchTab(tab) {
+    activeTab = tab;
+    document.getElementById('tabURL').classList.toggle('active', tab === 'url');
+    document.getElementById('tabSearch').classList.toggle('active', tab === 'search');
+    document.getElementById('urlSection').style.display = tab === 'url' ? 'block' : 'none';
+    document.getElementById('searchSection').style.display = tab === 'search' ? 'block' : 'none';
+    if (tab === 'search') {
+      document.getElementById('searchEmpty').style.display = 'block';
+      document.getElementById('progressCard').style.display = 'none';
+      document.getElementById('dlReady').style.display = 'none';
+    }
+  }
+
+  async function pasteURL() {
+    try {
+      const t = await navigator.clipboard.readText();
+      document.getElementById('urlInput').value = t;
+    } catch {
+      alert('Allow clipboard access or paste manually.');
+    }
+  }
+
+  function showError(msg) {
+    const b = document.getElementById('errorBox');
+    b.textContent = '❌ ' + msg;
+    b.style.display = 'block';
+  }
+  function hideError() { document.getElementById('errorBox').style.display = 'none'; }
+
+  function showSearchError(msg) {
+    const b = document.getElementById('searchErrorBox');
+    b.textContent = '❌ ' + msg;
+    b.style.display = 'block';
+  }
+  function hideSearchError() { document.getElementById('searchErrorBox').style.display = 'none'; }
+
+  function setAnalyzing(on, msg='Fetching video info…') {
+    const el = document.getElementById('analyzeLoader');
+    el.style.display = on ? 'flex' : 'none';
+    document.getElementById('analyzeMsg').textContent = msg;
+    document.getElementById('analyzeBtn').disabled = on;
+  }
+
+  // SEARCH SONGS
+  async function searchSongs() {
+    const query = document.getElementById('searchInput').value.trim();
+    if (!query) { showSearchError('Please enter a song name.'); return; }
+    hideSearchError();
+    document.getElementById('searchResults').innerHTML = '';
+    document.getElementById('searchEmpty').style.display = 'none';
+    document.getElementById('searchLoader').style.display = 'flex';
+    document.getElementById('searchBtn').disabled = true;
+
+    try {
+      const res = await fetch('/api/search', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({query})
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || 'Search failed');
+
+      const results = data.results || [];
+      if (results.length === 0) {
+        document.getElementById('searchEmpty').style.display = 'block';
+        document.getElementById('searchEmpty').querySelector('div:last-child').textContent = 'No results found. Try a different search.';
+        return;
+      }
+
+      const container = document.getElementById('searchResults');
+      container.innerHTML = results.map(r => `
+        <div class="result-card">
+          <img class="result-thumb" src="${r.thumbnail || ''}" onerror="this.style.display='none'" alt="">
+          <div class="result-info">
+            <div class="result-title">${r.title}</div>
+            <div class="result-meta">${[r.uploader, r.duration].filter(Boolean).join(' · ')}</div>
+          </div>
+          <button class="result-dl-btn" onclick="downloadFromSearch('${encodeURIComponent(r.url)}', '${encodeURIComponent(r.title)}')">⬇ MP3</button>
+        </div>
+      `).join('');
+
+    } catch(e) {
+      showSearchError(e.message);
+    } finally {
+      document.getElementById('searchLoader').style.display = 'none';
+      document.getElementById('searchBtn').disabled = false;
+    }
+  }
+
+  async function downloadFromSearch(encodedUrl, encodedTitle) {
+    const url = decodeURIComponent(encodedUrl);
+    hideSearchError();
+    document.getElementById('progressCard').style.display = 'block';
+    document.getElementById('dlReady').style.display = 'none';
+    document.getElementById('progBar').style.width = '0%';
+    document.getElementById('progPct').textContent = '0%';
+    document.getElementById('progSpeed').textContent = '';
+    document.getElementById('progLabel').textContent = 'Starting download…';
+
+    try {
+      const res = await fetch('/api/download', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({url, quality: 'audio', format: 'mp3'})
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error);
+      currentJobId = data.job_id;
+      pollProgress();
+    } catch(e) {
+      showSearchError(e.message);
+      document.getElementById('progressCard').style.display = 'none';
+    }
+  }
+
+  async function analyzeURL() {
+    const url = document.getElementById('urlInput').value.trim();
+    if (!url) { showError('Please paste a video URL first.'); return; }
+    hideError();
+    document.getElementById('videoInfo').style.display = 'none';
+    document.getElementById('qualitySection').style.display = 'none';
+    document.getElementById('progressCard').style.display = 'none';
+    document.getElementById('dlReady').style.display = 'none';
+    setAnalyzing(true);
+
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 90000);
+      let res;
+      try {
+        res = await fetch('/api/info', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({url}),
+          signal: controller.signal
+        });
+      } catch(fetchErr) {
+        if (fetchErr.name === 'AbortError') throw new Error('Request timed out after 90s. The server may be waking up — please try again.');
+        throw new Error('Cannot reach server. Check your internet connection and try again.');
+      } finally { clearTimeout(timer); }
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || 'Could not fetch video');
+
+      currentVideoInfo = data;
+
+      const thumb = document.getElementById('viThumb');
+      if (data.thumbnail) { thumb.src = data.thumbnail; thumb.style.display='block'; }
+      else { thumb.style.display='none'; }
+      document.getElementById('viTitle').textContent = data.title;
+      let meta = [];
+      if (data.uploader) meta.push(data.uploader);
+      if (data.duration) meta.push(data.duration);
+      if (data.view_count) meta.push(Number(data.view_count).toLocaleString() + ' views');
+      if (data.platform) meta.push(data.platform);
+      document.getElementById('viMeta').textContent = meta.join(' · ');
+      document.getElementById('videoInfo').style.display = 'flex';
+
+      const grid = document.getElementById('qualityGrid');
+      const fmts = data.formats && data.formats.length > 0 ? data.formats : [
+        {quality:'1080p', size_mb:null},{quality:'720p', size_mb:null},{quality:'480p', size_mb:null},
+        {quality:'360p', size_mb:null},{quality:'240p', size_mb:null}
+      ];
+      const allOpts = [...fmts, {quality:'audio', size_mb:null}];
+      grid.innerHTML = allOpts.map((f, i) => {
+        const isAudio = f.quality === 'audio';
+        const label = isAudio ? 'Audio' : f.quality;
+        const size = f.size_mb ? `~${f.size_mb} MB` : '';
+        const tag = i === 0 ? 'Best' : (f.quality === '720p' ? 'Recommended' : '');
+        const sel = f.quality === '720p' || (i===0 && !allOpts.find(x=>x.quality==='720p')) ? 'sel' : '';
+        if (sel) selectedQuality = f.quality;
+        return `<div class="opt-btn ${sel}" onclick="selQuality(this,'${f.quality}')">
+          <div class="qlabel">${label}</div>
+          ${size ? `<div class="qsize">${size}</div>` : ''}
+          ${tag ? `<div class="qtag">${tag}</div>` : ''}
+        </div>`;
+      }).join('');
+
+      document.getElementById('qualitySection').style.display = 'block';
+    } catch(e) {
+      showError(e.message);
+    } finally {
+      setAnalyzing(false);
+    }
+  }
+
+  function selQuality(el, q) {
+    document.querySelectorAll('.opt-btn').forEach(x=>x.classList.remove('sel'));
+    el.classList.add('sel');
+    selectedQuality = q;
+    if (q === 'audio') selFmt(document.querySelector('[data-fmt="mp3"]'));
+  }
+
+  function selFmt(el) {
+    document.querySelectorAll('.fmt-btn').forEach(x=>x.classList.remove('sel'));
+    el.classList.add('sel');
+    selectedFormat = el.dataset.fmt;
+  }
+
+  async function startDownload() {
+    const url = document.getElementById('urlInput').value.trim();
+    if (!url) return;
+    hideError();
+    document.getElementById('dlBtn').disabled = true;
+    document.getElementById('dlReady').style.display = 'none';
+
+    const prog = document.getElementById('progressCard');
+    prog.style.display = 'block';
+    document.getElementById('progBar').style.width = '0%';
+    document.getElementById('progPct').textContent = '0%';
+    document.getElementById('progSpeed').textContent = '';
+    document.getElementById('progLabel').textContent = 'Starting download…';
+
+    try {
+      const res = await fetch('/api/download', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({url, quality: selectedQuality, format: selectedFormat})
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error);
+      currentJobId = data.job_id;
+      pollProgress();
+    } catch(e) {
+      showError(e.message);
+      document.getElementById('dlBtn').disabled = false;
+      prog.style.display = 'none';
+    }
+  }
+
+  function pollProgress() {
+    if (!currentJobId) return;
+    pollTimer = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/status/${currentJobId}`);
+        const data = await res.json();
+        if (data.error) { clearInterval(pollTimer); showError(data.error); return; }
+
+        const pct = data.progress || 0;
+        document.getElementById('progBar').style.width = pct + '%';
+        document.getElementById('progPct').textContent = pct + '%';
+        if (data.speed) document.getElementById('progSpeed').textContent = data.speed;
+        if (data.status === 'downloading') document.getElementById('progLabel').textContent = 'Downloading…';
+        if (data.status === 'queued') document.getElementById('progLabel').textContent = 'Queued…';
+
+        if (data.status === 'done') {
+          clearInterval(pollTimer);
+          document.getElementById('progressCard').style.display = 'none';
+          document.getElementById('dlBtn') && (document.getElementById('dlBtn').disabled = false);
+          const ready = document.getElementById('dlReady');
+          ready.style.display = 'flex';
+          document.getElementById('dlReadyName').textContent = data.filename || 'Your file is ready';
+          document.getElementById('dlFileLink').href = `/api/file/${currentJobId}`;
+          document.getElementById('dlFileLink').download = data.filename || 'audio';
+        }
+        if (data.status === 'error') {
+          clearInterval(pollTimer);
+          document.getElementById('progressCard').style.display = 'none';
+          document.getElementById('dlBtn') && (document.getElementById('dlBtn').disabled = false);
+          const errMsg = data.error || 'Download failed.';
+          if (activeTab === 'search') showSearchError(errMsg);
+          else showError(errMsg);
+        }
+      } catch {
+        clearInterval(pollTimer);
+        showError('Lost connection to server. Please try again.');
+      }
+    }, 1200);
+  }
+
+  document.getElementById('urlInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') analyzeURL();
+  });
+  document.getElementById('searchInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') searchSongs();
+  });
+
+  fetch('/api/ping').catch(()=>{});
+</script>
+</body>
+</html>
