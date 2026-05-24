@@ -153,6 +153,36 @@ def get_info():
         return jsonify({"error": err}), 400
 
 
+@app.route("/api/search", methods=["POST"])
+def search_songs():
+    data = request.json or {}
+    query = data.get("query", "").strip()
+    if not query:
+        return jsonify({"error": "No query provided"}), 400
+    try:
+        opts = get_base_opts()
+        opts["skip_download"] = True
+        opts["quiet"] = True
+        search_url = f"scsearch5:{query}"
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(search_url, download=False)
+
+        results = []
+        for entry in (info.get("entries") or []):
+            if entry:
+                results.append({
+                    "url": entry.get("webpage_url", ""),
+                    "title": entry.get("title", "Unknown"),
+                    "uploader": entry.get("uploader", ""),
+                    "duration": entry.get("duration_string") or "",
+                    "thumbnail": entry.get("thumbnail", ""),
+                    "view_count": entry.get("view_count"),
+                })
+        return jsonify({"results": results})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
 @app.route("/api/download", methods=["POST"])
 def start_download():
     data = request.json or {}
@@ -205,3 +235,4 @@ def ping():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+        
