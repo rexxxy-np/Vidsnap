@@ -26,7 +26,7 @@ def get_base_opts():
         "quiet": True,
         "no_warnings": True,
         "socket_timeout": 30,
-        "proxy": "http://blnvtneo:vt7esvvg8ezs@38.154.203.95:5863",
+        "extractor_args": {"youtube": {"player_client": ["ios"]}},
     }
     if os.path.exists(COOKIES_FILE):
         opts["cookiefile"] = COOKIES_FILE
