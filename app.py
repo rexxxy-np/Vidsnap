@@ -14,10 +14,22 @@ CORS(app)
 DOWNLOAD_DIR = Path("downloads")
 DOWNLOAD_DIR.mkdir(exist_ok=True)
 
+COOKIES_FILE = "cookies.txt"
+
 jobs = {}
 
 def clean_filename(name):
     return re.sub(r'[^\w\s\-_.]', '', name)[:80]
+
+def get_base_opts():
+    opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "socket_timeout": 30,
+    }
+    if os.path.exists(COOKIES_FILE):
+        opts["cookiefile"] = COOKIES_FILE
+    return opts
 
 def run_download(job_id, url, quality, fmt):
     jobs[job_id]["status"] = "downloading"
@@ -35,35 +47,25 @@ def run_download(job_id, url, quality, fmt):
 
     output_path = str(DOWNLOAD_DIR / f"{job_id}.%(ext)s")
 
+    opts = get_base_opts()
+    opts["outtmpl"] = output_path
+    opts["progress_hooks"] = [progress_hook]
+
     if fmt == "mp3":
-        ydl_opts = {
-            "format": "bestaudio/best",
-            "outtmpl": output_path,
-            "progress_hooks": [progress_hook],
-            "postprocessors": [{
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": "mp3",
-                "preferredquality": "192",
-            }],
-            "quiet": True,
-            "no_warnings": True,
-            "socket_timeout": 30,
-        }
+        opts["format"] = "bestaudio/best"
+        opts["postprocessors"] = [{
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "mp3",
+            "preferredquality": "192",
+        }]
     else:
         height_map = {"1080p": 1080, "720p": 720, "480p": 480, "360p": 360, "240p": 240}
         height = height_map.get(quality, 720)
-        ydl_opts = {
-            "format": f"bestvideo[height<={height}][ext=mp4]+bestaudio[ext=m4a]/best[height<={height}]/best",
-            "outtmpl": output_path,
-            "progress_hooks": [progress_hook],
-            "merge_output_format": "mp4",
-            "quiet": True,
-            "no_warnings": True,
-            "socket_timeout": 30,
-        }
+        opts["format"] = f"bestvideo[height<={height}][ext=mp4]+bestaudio[ext=m4a]/best[height<={height}]/best"
+        opts["merge_output_format"] = "mp4"
 
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)
             title = clean_filename(info.get("title", "video"))
             ext = "mp3" if fmt == "mp3" else "mp4"
@@ -101,15 +103,9 @@ def get_info():
     if not url:
         return jsonify({"error": "No URL provided"}), 400
     try:
-        ydl_opts = {
-            "quiet": True,
-            "no_warnings": True,
-            "skip_download": True,
-            "socket_timeout": 20,
-            # Try to avoid bot detection
-            "extractor_args": {"youtube": {"skip": ["dash", "hls"]}},
-        }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        opts = get_base_opts()
+        opts["skip_download"] = True
+        with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=False)
 
         formats = []
@@ -143,9 +139,8 @@ def get_info():
         })
     except Exception as e:
         err = str(e)
-        # Friendlier error messages
         if "Sign in" in err or "bot" in err.lower():
-            err = "YouTube is blocking this request. Try a different video or use a direct youtu.be link."
+            err = "YouTube is blocking this request. Try again or use a different video."
         elif "Private" in err or "private" in err:
             err = "This video is private."
         elif "unavailable" in err.lower():
@@ -198,9 +193,11 @@ def download_file(job_id):
 
 @app.route("/api/ping")
 def ping():
-    return jsonify({"status": "ok"})
+    cookies_loaded = os.path.exists(COOKIES_FILE)
+    return jsonify({"status": "ok", "cookies": cookies_loaded})
 
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+    
