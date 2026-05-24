@@ -21,17 +21,17 @@ jobs = {}
 def clean_filename(name):
     return re.sub(r'[^\w\s\-_.]', '', name)[:80]
 
-def get_base_opts():
+    def get_base_opts():
     opts = {
         "quiet": True,
         "no_warnings": True,
         "socket_timeout": 30,
+        "proxy": "http://blnvtneo:vt7esvvg8ezs@38.154.203.95:5863",
     }
     if os.path.exists(COOKIES_FILE):
         opts["cookiefile"] = COOKIES_FILE
     return opts
-
-def run_download(job_id, url, quality, fmt):
+    def run_download(job_id, url, quality, fmt):
     jobs[job_id]["status"] = "downloading"
 
     def progress_hook(d):
