@@ -436,11 +436,20 @@
     setAnalyzing(true);
 
     try {
-      const res = await fetch('/api/info', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({url})
-      });
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 90000); // 90s timeout
+      let res;
+      try {
+        res = await fetch('/api/info', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({url}),
+          signal: controller.signal
+        });
+      } catch(fetchErr) {
+        if (fetchErr.name === 'AbortError') throw new Error('Request timed out after 90s. The server may be waking up — please try again.');
+        throw new Error('Cannot reach server. Check your internet connection and try again.');
+      } finally { clearTimeout(timer); }
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || 'Could not fetch video');
 
@@ -552,12 +561,4 @@
           clearInterval(pollTimer);
           document.getElementById('progressCard').style.display = 'none';
           document.getElementById('dlBtn').disabled = false;
-          const ready = document.getElementById('dlReady');
-          ready.style.display = 'flex';
-          document.getElementById('dlReadyName').textContent = data.filename || 'Your file is ready';
-          document.getElementById('dlFileLink').href = `/api/file/${currentJobId}`;
-          document.getElementById('dlFileLink').download = data.filename || 'video';
-        }
-        if (data.status === 'error') {
-          clearInterval(pollTimer);
-          document.getElementById('progressCard').style.di
+          const
